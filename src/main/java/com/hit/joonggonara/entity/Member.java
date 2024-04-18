@@ -23,8 +23,10 @@ public class Member {
     private String phoneNumber;
     private String school;
     @Column(nullable = false)
+    @Enumerated(EnumType.STRING)
     private LoginType loginType;
     @Column(nullable = false)
+    @Enumerated(EnumType.STRING)
     private Role role;
 
 

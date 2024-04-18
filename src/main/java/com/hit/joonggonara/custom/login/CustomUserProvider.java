@@ -2,7 +2,6 @@ package com.hit.joonggonara.custom.login;
 
 import com.hit.joonggonara.error.CustomException;
 import com.hit.joonggonara.error.errorCode.UserErrorCode;
-import com.hit.joonggonara.jwt.JwtUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
