@@ -37,3 +37,7 @@ out/
 .vscode/
 application-test.yaml
 org.springframework.boot.autoconfigure.AutoConfiguration.imports
+
+src/main/java/com/hit/joonggonara/config/P6SpyConfig.java
+
+src/main/resources/data.sql
