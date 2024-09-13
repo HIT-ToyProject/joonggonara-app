@@ -5,10 +5,8 @@ import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import org.hibernate.annotations.SQLDelete;
 
 
-@SQLDelete(sql = "UPDATE chat SET is_deleted = true, message = '삭제된 메세지입니다.' WHERE id = ?")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Getter
 @Entity
@@ -20,7 +18,7 @@ public class Chat extends BaseEntity {
     private String message;
     private String createdMassageDate;
     private String senderNickName;
-    private boolean isDeleted;
+    private boolean isFirstMessage;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "room_id")
@@ -31,12 +29,13 @@ public class Chat extends BaseEntity {
             String message,
             String createdMassageDate,
             ChatRoom chatRoom,
-            String senderNickName
+            String senderNickName,
+            boolean isFirstMessage
     ) {
         this.message = message;
         this.createdMassageDate = createdMassageDate;
         this.senderNickName = senderNickName;
-        this.isDeleted = false;
+        this.isFirstMessage = isFirstMessage;
         addChatRoom(chatRoom);
     }
 

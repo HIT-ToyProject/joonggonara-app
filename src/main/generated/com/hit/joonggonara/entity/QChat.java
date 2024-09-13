@@ -33,7 +33,7 @@ public class QChat extends EntityPathBase<Chat> {
 
     public final NumberPath<Long> id = createNumber("id", Long.class);
 
-    public final BooleanPath isDeleted = createBoolean("isDeleted");
+    public final BooleanPath isFirstMessage = createBoolean("isFirstMessage");
 
     public final StringPath message = createString("message");
 
@@ -60,7 +60,7 @@ public class QChat extends EntityPathBase<Chat> {
 
     public QChat(Class<? extends Chat> type, PathMetadata metadata, PathInits inits) {
         super(type, metadata, inits);
-        this.chatRoom = inits.isInitialized("chatRoom") ? new QChatRoom(forProperty("chatRoom")) : null;
+        this.chatRoom = inits.isInitialized("chatRoom") ? new QChatRoom(forProperty("chatRoom"), inits.get("chatRoom")) : null;
     }
 
 }

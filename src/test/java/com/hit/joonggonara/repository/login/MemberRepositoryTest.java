@@ -13,15 +13,18 @@ import com.hit.joonggonara.repository.login.condition.VerificationCondition;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestPropertySource;
 
-import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+@AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
+@ActiveProfiles("test")
 @TestPropertySource(locations = "classpath:/application.yaml")
 @Import({JPAConfig.class, P6SpyConfig.class})
 @DataJpaTest
@@ -151,7 +154,7 @@ class MemberRepositoryTest {
         //then
         assertThat(expectedValue).isFalse();
     }
-    
+
     @Test
     @DisplayName("[JPA][QueryDsl][아이디 찾기] 이름과 이메일로 검색해서 회원이 있을 경우 true를 리턴")
     void UserExistByUserNameAndEmailTest() throws Exception
@@ -249,25 +252,7 @@ class MemberRepositoryTest {
         assertThat(expectedValue).isFalse();
     }
 
-    @Test
-    @DisplayName("[JPA][SoftDelete] Delete 쿼리 시 Update 쿼리 실행 is_delete가 false일 경우만 조회 ")
-    void deleteByUserIdTest() throws Exception
-    {
-        //given
-        Member member1 = createMember("testId1", LoginType.KAKAO);
-        Member member2 = createMember("testId2", LoginType.KAKAO);
 
-        sut.save(member1);
-        sut.save(member2);
-        //when
-        sut.deleteByUserId(member1.getUserId());
-        List<Member> expectedMembers = sut.findAll();
-        //then
-        assertThat(expectedMembers).isNotNull();
-        assertThat(expectedMembers.size()).isEqualTo(1);
-        assertThat(expectedMembers.get(0).isDeleted()).isFalse();
-    }
-    
     @Test
     @DisplayName("[JPA][QueryDsl] Email 찾기를 통해 회원 아이디를 Optional로 리턴")
     void ReturnUserIdToOptionalByEmail() throws Exception
@@ -335,7 +320,7 @@ class MemberRepositoryTest {
         //then
         assertThat(expectedPassword).isEqualTo(member.getPassword());
     }
-    
+
     @Test
     @DisplayName("[JPA][QueryDsl] 일반 로그인 회원 일 경우 userId 를 통해 조회 후 Optional 객체를 반환")
     void returnOptionalMemberWhenUserIsAGeneralUser() throws Exception
@@ -345,7 +330,7 @@ class MemberRepositoryTest {
         Member member = createMember("testId", LoginType.GENERAL);
         sut.save(member);
         //when
-        Member expectedMember = sut.findByPrincipal(loginCondition).get();
+        Member expectedMember = sut.findByPrincipalAndLoginType(loginCondition).get();
         //then
         assertThat(expectedMember).isNotNull();
         assertThat(expectedMember.getUserId()).isEqualTo(loginCondition.principal());
@@ -359,7 +344,7 @@ class MemberRepositoryTest {
         //given
         LoginCondition loginCondition = LoginCondition.of("testId", LoginType.GENERAL);
         //when
-        Optional<Member> expectedMember = sut.findByPrincipal(loginCondition);
+        Optional<Member> expectedMember = sut.findByPrincipalAndLoginType(loginCondition);
         //then
         assertThat(expectedMember).isEmpty();
     }
@@ -373,7 +358,7 @@ class MemberRepositoryTest {
         Member member = createMember("test@email.com", LoginType.KAKAO);
         sut.save(member);
         //when
-        Member expectedMember = sut.findByPrincipal(loginCondition).get();
+        Member expectedMember = sut.findByPrincipalAndLoginType(loginCondition).get();
         //then
         assertThat(expectedMember).isNotNull();
         assertThat(expectedMember.getUserId()).isEqualTo(loginCondition.principal());
@@ -405,7 +390,7 @@ class MemberRepositoryTest {
         //then
         assertThat(expectedTrue).isFalse();
     }
-    
+
     @Test
     @DisplayName("[JPA][QueryDsl] 일반 회원일 경우 아이디로 회원 조회")
     void checkMemberWithUserIDIfMemberIsAGeneralMember() throws Exception
@@ -415,7 +400,8 @@ class MemberRepositoryTest {
         Member member = createMember("userId", LoginType.GENERAL);
         Member savedMember = sut.save(member);
         //when
-        Member expectedMember = sut.findByPrincipalAndLoginType(principal, LoginType.GENERAL).get();
+        Member expectedMember =
+                sut.findByPrincipalAndLoginType(LoginCondition.of(principal, LoginType.GENERAL)).get();
         //then
         assertThat(expectedMember.getId()).isEqualTo(savedMember.getId());
         assertThat(expectedMember.getUserId()).isEqualTo(savedMember.getUserId());
@@ -431,7 +417,7 @@ class MemberRepositoryTest {
         Member member = createMember("userId", LoginType.KAKAO);
         Member savedMember = sut.save(member);
         //when
-        Member expectedMember = sut.findByPrincipalAndLoginType(principal, LoginType.KAKAO).get();
+        Member expectedMember = sut.findByPrincipalAndLoginType(LoginCondition.of(principal, LoginType.KAKAO)).get();
         //then
         assertThat(expectedMember.getId()).isEqualTo(savedMember.getId());
         assertThat(expectedMember.getEmail()).isEqualTo(savedMember.getEmail());

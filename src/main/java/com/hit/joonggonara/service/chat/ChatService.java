@@ -1,20 +1,24 @@
 package com.hit.joonggonara.service.chat;
 
 import com.hit.joonggonara.common.error.CustomException;
+import com.hit.joonggonara.common.error.errorCode.ProductErrorCode;
 import com.hit.joonggonara.common.error.errorCode.ChatErrorCode;
 import com.hit.joonggonara.common.error.errorCode.UserErrorCode;
 import com.hit.joonggonara.common.type.ChatRoomStatus;
 import com.hit.joonggonara.dto.request.chat.ChatRequest;
 import com.hit.joonggonara.dto.request.chat.ChatRoomRequest;
+import com.hit.joonggonara.dto.response.product.ProductResponse;
 import com.hit.joonggonara.dto.response.chat.ChatResponse;
 import com.hit.joonggonara.dto.response.chat.ChatRoomAllResponse;
 import com.hit.joonggonara.dto.response.chat.ChatRoomResponse;
 import com.hit.joonggonara.entity.Chat;
 import com.hit.joonggonara.entity.ChatRoom;
 import com.hit.joonggonara.entity.Member;
+import com.hit.joonggonara.entity.Product;
 import com.hit.joonggonara.repository.chat.ChatRepository;
 import com.hit.joonggonara.repository.chat.ChatRoomRepository;
 import com.hit.joonggonara.repository.login.MemberRepository;
+import com.hit.joonggonara.repository.product.ProductRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,6 +33,8 @@ public class ChatService {
 
     private final ChatRoomRepository chatRoomRepository;
     private final ChatRepository chatRepository;
+    private final ProductRepository productRepository;
+    private final MemberRepository memberRepository;
 
 
     // 채팅 기록 저장
@@ -45,13 +51,6 @@ public class ChatService {
     }
 
 
-    // 채팅 기록 삭제 (is_deleted를 true로 변경, messgage에 삭제된 메세지로 변경)
-    @Transactional
-    public boolean deleteChat(Long chatId){
-        chatRepository.deleteById(chatId);
-        return true;
-    }
-
     // 채팅방 채팅 전체 조회 (정렬-> createMessageTime 내림차순)
     // roomId
     // response: roomId, senderNickName, message, createMessageTime
@@ -62,20 +61,36 @@ public class ChatService {
 
     // 채팅방 생성
     @Transactional
-    public ChatRoomResponse createRoom(ChatRoomRequest chatRoomRequest){
-        ChatRoom chatRoom = ChatRoom.builder()
-                .profile(chatRoomRequest.profile())
-                .buyerNickName(chatRoomRequest.buyerNickName())
-                .sellerNickName(chatRoomRequest.sellerNickName())
-                .build();
+    public ChatRoomResponse createRoom(ChatRoomRequest chatRoomRequest, Long productId){
 
-        return ChatRoomResponse.fromResponse(chatRoomRepository.save(chatRoom));
+        // 회원이 null 이고 상품이 null 일경우 회원 탈퇴한 회원
+        Member buyer = memberRepository.findMemberByNickNameAndDeletedIsFalse(chatRoomRequest.buyerNickName()).orElse(null);
+
+        Member seller = memberRepository.findMemberByNickNameAndDeletedIsFalse(chatRoomRequest.sellerNickName()).orElse(null);
+
+        Product product = productRepository.findProductById(productId).orElse(null);
+
+        if(buyer == null && product == null || seller == null && product == null){
+            throw new CustomException(UserErrorCode.ALREADY_WITHDRAWAL_USER);
+        }
+
+        ChatRoom chatRoom = chatRoomRepository.
+                findChatRoomByBuyerNickNameAndSellerNickNameAndProductId(chatRoomRequest.buyerNickName(), chatRoomRequest.sellerNickName(), productId)
+                .orElseGet(() -> chatRoomRepository.save(
+                        ChatRoom.builder()
+                                .buyer(buyer)
+                                .seller(seller)
+                                .product(product)
+                                .build()));
+
+        return ChatRoomResponse.fromResponse(chatRoom);
     }
 
     // 채팅방 전체 조회
     public List<ChatRoomAllResponse> getAllChatRoom(String nickName){
-        List<ChatRoom> chatRoomDtoAllByNickName = chatRoomRepository.findAllByNickName(nickName);
-        return chatRoomDtoAllByNickName.stream().map(chatRoom -> ChatRoomAllResponse.fromResponse(chatRoom, nickName))
+        return chatRoomRepository.findAllByNickName(nickName)
+                .stream()
+                .map(chatRoom -> ChatRoomAllResponse.fromResponse(chatRoom, nickName))
                 .collect(Collectors.toList());
     }
 
@@ -95,13 +110,20 @@ public class ChatService {
         }else{
             chatRoom.setSellerDeleted(true);
         }
+
+        if(chatRoom.isBuyerDeleted() && chatRoom.isSellerDeleted()){
+            chatRoomRepository.deleteById(chatRoom.getId());
+        }
+
         return true;
     }
 
-
-
-
-
-
-
+    public ProductResponse getProduct(Long roomId) {
+        ChatRoom chatRoom = chatRoomRepository.findByRoomId(roomId)
+                .orElseThrow(() -> new CustomException(ChatErrorCode.NOT_FOUND_CHATROOM));
+        if(chatRoom.getProduct() == null){
+            throw new CustomException(ProductErrorCode.NOT_EXIST_PRODUCT);
+        }
+        return ProductResponse.fromResponse(chatRoom.getProduct());
+    }
 }

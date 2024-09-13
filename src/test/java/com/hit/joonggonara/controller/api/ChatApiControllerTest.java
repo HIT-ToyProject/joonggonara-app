@@ -44,9 +44,9 @@ class ChatApiControllerTest {
         //given
         ChatRoomRequest chatRoomRequest = ChatRoomRequest.of("profile", "buyerNickName", "sellerNickName");
         ChatRoomResponse chatRoomResponse = createChatRoomResponse();
-        given(chatService.createRoom(any())).willReturn(chatRoomResponse);
+        given(chatService.createRoom(any(), any())).willReturn(chatRoomResponse);
         //when & then
-        mvc.perform(post("/chat/room/create")
+        mvc.perform(post("/chat/room/create/" + 1L)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(chatRoomRequest))
                         .with(csrf())
@@ -56,27 +56,13 @@ class ChatApiControllerTest {
                 .andExpect(jsonPath("$.nickName").value("buyer"))
                 .andExpect(jsonPath("$.profile").value("profile"));
 
-        then(chatService).should().createRoom(any());
+
+        then(chatService).should().createRoom(any(), any());
     }
 
 
 
-    @WithMockUser(username = "USER")
-    @Test
-    @DisplayName("[API][Delete] 채팅 기록 삭제")
-    void deleteChatHistoryTest() throws Exception
-    {
-        //given
-        given(chatService.deleteChat(any())).willReturn(true);
-        //when & then
-        mvc.perform(delete("/chat/delete/" + 1L)
-                .contentType(MediaType.APPLICATION_JSON)
-                .with(csrf())
-        ).andExpect(status().isOk())
-                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
-                .andExpect(jsonPath("$").value(true));
-        then(chatService).should().deleteChat(any());
-    }
+
 
     @WithMockUser(username = "USER")
     @Test
@@ -87,7 +73,7 @@ class ChatApiControllerTest {
         given(chatService.getAllChats(any())).willReturn(
                 List.of(ChatResponse.of(1L, "message",
                         LocalDateTime.of(2024, 6, 20 ,  14, 50, 0).toString(),
-                        "hong"))
+                        "hong", false))
         );
         //when
         mvc.perform(get("/chat/all/" + 1L)
@@ -109,7 +95,8 @@ class ChatApiControllerTest {
     {
         //given
         ChatRoomAllResponse chatRoomAllResponse;
-        chatRoomAllResponse = ChatRoomAllResponse.of(1L, "profile", "message", LocalDateTime.now().toString(), "roomName", BUYER);
+        chatRoomAllResponse = ChatRoomAllResponse.of(1L, "profile", "message",
+                LocalDateTime.now().toString(), "roomName", false, BUYER);
         given(chatService.getAllChatRoom(any())).willReturn(List.of(chatRoomAllResponse));
         //when & then
         mvc.perform(get("/chat/room")
@@ -164,7 +151,8 @@ class ChatApiControllerTest {
                 1L,
                 "seller",
                 "profile",
-                "buyer"
+                "buyer",
+                null
         );
     }
 

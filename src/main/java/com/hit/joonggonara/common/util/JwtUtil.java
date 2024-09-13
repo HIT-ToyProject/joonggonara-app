@@ -5,11 +5,10 @@ import com.hit.joonggonara.common.error.errorCode.UserErrorCode;
 import com.hit.joonggonara.common.properties.JwtProperties;
 import com.hit.joonggonara.common.type.LoginType;
 import com.hit.joonggonara.common.type.Role;
-import com.hit.joonggonara.dto.login.OidcUserInfoDto;
+import com.hit.joonggonara.common.type.TokenType;
 import com.hit.joonggonara.dto.login.TokenDto;
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -25,7 +24,6 @@ import java.util.HashMap;
 import java.util.Map;
 
 
-@Slf4j
 @Component
 public class JwtUtil {
 
@@ -40,7 +38,7 @@ public class JwtUtil {
 
 
     public TokenDto createToken(String principal, Role role, LoginType loginType){
-        long accessTokenPeriod = 1000L * 60L * 30L; // 30분
+        long accessTokenPeriod = 1000L * 60L * 60L * 24L * 14; // 30분
         long refreshTokenPeriod = 1000L * 60L * 60L * 24L * 14; // 2주
 
         String accessToken = createAccessToken(principal, role, loginType, accessTokenPeriod);
@@ -88,14 +86,20 @@ public class JwtUtil {
     }
 
     // token 유효성 검사
-    public boolean validateToken(String token){
+    public boolean validateToken(String token, TokenType tokenType){
         try{
+
             Jwts.parserBuilder().setSigningKey(SECRET_KEY).build().parseClaimsJws(token);
             return true;
         }catch (SecurityException | MalformedJwtException | IllegalArgumentException e) {
             throw new CustomException(UserErrorCode.INVALID_TOKEN);
         } catch (ExpiredJwtException e) {
-            throw new CustomException(UserErrorCode.EXPIRED_TOKEN);
+            if(tokenType.equals(TokenType.ACCESS_TOKEN)){
+                throw new CustomException(UserErrorCode.EXPIRED_TOKEN);
+            }else{
+                throw new CustomException(UserErrorCode.REFRESH_TOKEN_EXPIRED_TOKEN);
+            }
+
         } catch (UnsupportedJwtException e) {
             throw new CustomException(UserErrorCode.UNSUPPORTED_TOKEN);
         }
@@ -190,7 +194,6 @@ public class JwtUtil {
 
     public Map<String, String> getOidcTokenBody(String token, String modulus, String exponent) {
         Claims claims = validationIdToken(token, modulus, exponent).getBody();
-        log.info(claims.toString());
         return Map.of("email", String.valueOf(claims.get("email")), "profile", String.valueOf(claims.get("picture")));
     }
 

@@ -2,9 +2,12 @@ package com.hit.joonggonara.controller.api;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.hit.joonggonara.common.properties.JwtProperties;
+import com.hit.joonggonara.common.type.LoginType;
 import com.hit.joonggonara.dto.request.login.MemberUpdateRequest;
 import com.hit.joonggonara.dto.request.login.SignUpPhoneNumberRequest;
 import com.hit.joonggonara.dto.request.login.VerificationRequest;
+import com.hit.joonggonara.dto.response.product.MemberResponse;
+import com.hit.joonggonara.service.product.ProductService;
 import com.hit.joonggonara.service.login.LoginService;
 import com.hit.joonggonara.service.login.SignUpService;
 import org.junit.jupiter.api.DisplayName;
@@ -12,9 +15,10 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -24,18 +28,19 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(MyPageApiController.class)
 class MyPageApiControllerTest {
 
-    
+
     @MockBean
     private SignUpService signUpService;
     @MockBean
     private LoginService loginService;
+    @MockBean
+    private ProductService productService;
     @Autowired
     private ObjectMapper objectMapper;
     @Autowired
@@ -49,17 +54,28 @@ class MyPageApiControllerTest {
         //given
         String token = JwtProperties.JWT_TYPE + "token";
         MemberUpdateRequest memberUpdateRequest = createMemberUpdateRequest();
+        MockMultipartFile memberUpdateMultiPart = new MockMultipartFile(
+                "memberUpdateRequest", "", "application/json",
+                objectMapper.writeValueAsBytes(memberUpdateRequest));
+        MockMultipartFile mockFile = new MockMultipartFile(
+                "profile", "test.jpg", "image/jpeg", "test image content".getBytes());
+        MemberResponse memberResponse = createMemberResponse();
+        given(loginService.memberUpdateInfo(any(), any(), any())).willReturn(memberResponse);
         //when
-        mvc.perform(post("/user/update/info")
-                .contentType(MediaType.APPLICATION_JSON)
-                .header(JwtProperties.AUTHORIZATION, token)
-                .content(objectMapper.writeValueAsString(memberUpdateRequest))
-                .with(csrf())
+        mvc.perform(multipart(HttpMethod.POST, "/user/update/info")
+                        .file(mockFile)
+                        .file(memberUpdateMultiPart)
+                        .contentType(MediaType.MULTIPART_FORM_DATA)
+                        .header(JwtProperties.AUTHORIZATION, token)
+                        .with(csrf())
         ).andExpect(status().isOk())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
-                .andExpect(jsonPath("$").value(true));
+                .andExpect(jsonPath("$.userId").value("userId"))
+                .andExpect(jsonPath("$.name").value("hong"))
+                .andExpect(jsonPath("$.email").value("test@email.com"))
+                .andExpect(jsonPath("$.loginType").value(LoginType.GENERAL.name()));
         //then
-        then(loginService).should().memberUpdateInfo(any(), any());
+        then(loginService).should().memberUpdateInfo(any(), any(), any());
     }
 
     @WithMockUser(username = "USER")
@@ -80,6 +96,7 @@ class MyPageApiControllerTest {
         //then
         then(signUpService).should().checkNickName(any());
     }
+
     @WithMockUser(username = "USER")
     @Test
     @DisplayName("[API][Get][Check] 닉네임 중복 검사 - 존재하지 않은 닉네임 false를 리턴")
@@ -98,7 +115,6 @@ class MyPageApiControllerTest {
         //then
         then(signUpService).should().checkNickName(any());
     }
-
     @PostMapping("/user/update/info/sms/verification")
     public ResponseEntity<Boolean> sendSms(@RequestBody SignUpPhoneNumberRequest phoneNumberRequest){
         return ResponseEntity.ok(signUpService.sendSmsVerificationCode(phoneNumberRequest));
@@ -124,13 +140,14 @@ class MyPageApiControllerTest {
         //then
         then(signUpService).should().sendSmsVerificationCode(any());
     }
+
     @WithMockUser(username = "USER")
     @Test
     @DisplayName("[API][Post][Code] 인증코드가 일치할 경우 true를 리턴")
     void returnTrueIfTheCodeMatches() throws Exception
     {
         //given
-        VerificationRequest verificationRequest = 
+        VerificationRequest verificationRequest =
                 createVerificationRequest();
         given(signUpService.checkCode(any())).willReturn(true);
         //when
@@ -144,7 +161,6 @@ class MyPageApiControllerTest {
         //then
         then(signUpService).should().checkCode(any());
     }
-
     @WithMockUser(username = "USER")
     @Test
     @DisplayName("[API][Post][Code] 인증코드가 불일치할 경우 false를 리턴")
@@ -174,14 +190,17 @@ class MyPageApiControllerTest {
         return SignUpPhoneNumberRequest.of("+861754562261");
     }
 
+    private static MemberResponse createMemberResponse() {
+        return MemberResponse.of(1L, "userId", "test@email.com", "hong"
+                , "nickName", null, "0100000000", LoginType.GENERAL);
+    }
+
 
     private MemberUpdateRequest createMemberUpdateRequest() {
         return MemberUpdateRequest.of(
                 "nickName",
                 "test@email.com",
-                "+8617545562261",
-                "profile",
-                true
+                "+8617545562261"
         );
     }
 

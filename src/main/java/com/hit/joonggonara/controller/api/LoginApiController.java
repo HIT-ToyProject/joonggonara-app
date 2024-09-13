@@ -8,10 +8,8 @@ import com.hit.joonggonara.common.type.LoginType;
 import com.hit.joonggonara.common.type.VerificationType;
 import com.hit.joonggonara.common.util.CookieUtil;
 import com.hit.joonggonara.dto.request.login.*;
-import com.hit.joonggonara.dto.response.login.FindUserIdResponse;
-import com.hit.joonggonara.dto.response.login.OAUth2UserResponse;
-import com.hit.joonggonara.dto.response.login.OAuth2UserDto;
-import com.hit.joonggonara.dto.response.login.TokenResponse;
+import com.hit.joonggonara.dto.response.product.MemberResponse;
+import com.hit.joonggonara.dto.response.login.*;
 import com.hit.joonggonara.service.login.LoginService;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
@@ -37,31 +35,31 @@ public class LoginApiController {
 
 
     @PostMapping("/user/login")
-    public ResponseEntity<Boolean> login(
+    public ResponseEntity<MemberResponse> login(
             HttpServletResponse response,
             @RequestBody @Valid LoginRequest loginRequest){
-        TokenResponse tokenResponse = loginService.login(loginRequest);
-        saveAccessTokenAndRefreshToken(response, tokenResponse.accessToken(), tokenResponse.refreshToken());
-        return ResponseEntity.ok(true);
+        MemberTokenResponse memberTokenResponse = loginService.login(loginRequest);
+        saveAccessTokenAndRefreshToken(response, memberTokenResponse.accessToken(), memberTokenResponse.refreshToken());
+        return ResponseEntity.ok(memberTokenResponse.memberResponse());
     }
 
 
     @GetMapping("/user/login/oauth2")
-    public ResponseEntity<String> sendOAuth2LoginPage(@RequestParam(name = "loginType") String loginType) throws IOException {
+    public ResponseEntity<String> sendOAuth2LoginPage(@RequestParam(name = "loginType") String loginType, HttpServletResponse response) throws IOException {
         return ResponseEntity.ok(loginService.sendRedirect(LoginType.checkType(loginType)));
     }
 
     @GetMapping("/user/login/oauth2/code/{loginType}")
-    public ResponseEntity<OAUth2UserResponse> OAuth2Login(@RequestParam(name = "code") String code,
+    public ResponseEntity<MemberResponse> OAuth2Login(@RequestParam(name = "code") String code,
                                                           @PathVariable(name = "loginType") String loginType,
                                                           HttpServletResponse response) throws JsonProcessingException {
-        System.out.println("code: " + code);
-        OAuth2UserDto oAuth2UserDto = loginService.oAuth2Login(code, LoginType.checkType(loginType));
-        if(oAuth2UserDto.signUpStatus()){
-            saveAccessTokenAndRefreshToken(response, oAuth2UserDto.accessToken(), oAuth2UserDto.refreshToken());
-            return ResponseEntity.ok(OAUth2UserResponse.fromResponse(oAuth2UserDto.principal(), oAuth2UserDto.profile(),true));
+
+        MemberTokenResponse memberTokenResponse = loginService.oAuth2Login(code, LoginType.checkType(loginType));
+        if(memberTokenResponse.accessToken() != null && memberTokenResponse.refreshToken() != null){
+            saveAccessTokenAndRefreshToken(response, memberTokenResponse.accessToken(), memberTokenResponse.refreshToken());
+            return ResponseEntity.ok(memberTokenResponse.memberResponse());
         }
-        return ResponseEntity.ok(OAUth2UserResponse.fromResponse(oAuth2UserDto.principal(),oAuth2UserDto.profile(), false));
+        return ResponseEntity.ok(memberTokenResponse.memberResponse());
     }
 
     @PutMapping("/user/login/reissue")
@@ -69,13 +67,13 @@ public class LoginApiController {
         String refreshToken = cookieUtil.getCookie(request)
                 .map(Cookie::getValue)
                 .orElseThrow(() -> new CustomException(UserErrorCode.ALREADY_LOGGED_OUT_USER));
-        TokenResponse tokenResponse = loginService.reissueToken(refreshToken);
+        TokenResponse memberTokenResponse = loginService.reissueToken(refreshToken);
 
         // 새로 발급 받은 AccessToken Header에 저장
-        response.setHeader(AUTHORIZATION, JWT_TYPE + tokenResponse.accessToken());
+        response.setHeader(AUTHORIZATION, JWT_TYPE + memberTokenResponse.accessToken());
 
         // 새로 발급 받은 RefreshToken Cookie에 저장
-        cookieUtil.addCookie(response, REFRESH_TOKEN_NAME, tokenResponse.refreshToken());
+        cookieUtil.addCookie(response, REFRESH_TOKEN_NAME, memberTokenResponse.refreshToken());
         return ResponseEntity.ok(true);
     }
 
@@ -129,7 +127,6 @@ public class LoginApiController {
     public ResponseEntity<Boolean> updatePassword(@RequestBody @Valid UpdatePasswordRequest updatePasswordRequest){
         return ResponseEntity.ok(loginService.updatePassword(updatePasswordRequest));
     }
-
 
 
     private void saveAccessTokenAndRefreshToken(HttpServletResponse response, String accessToken, String refreshToken) {
